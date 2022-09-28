@@ -15,6 +15,7 @@
 
 
 from asyncio import run_coroutine_threadsafe, get_event_loop
+from traceback import print_exc
 from inspect import iscoroutinefunction
 
 
@@ -29,11 +30,14 @@ class _EventSlot:
 
     def __call__(self, *a, **kw):
         for f in tuple(self.targets):
-            if iscoroutinefunction(f):
-                loop = self.__loop__ or get_event_loop()
-                run_coroutine(f(*a, **kw), loop)
-            else:
-                f(*a, **kw)
+            try:
+                if iscoroutinefunction(f):
+                    loop = self.__loop__ or get_event_loop()
+                    run_coroutine(f(*a, **kw), loop)
+                else:
+                    f(*a, **kw)
+            except Exception:
+                print_exc()
 
     def __iadd__(self, f):
         self.targets.append(f)
