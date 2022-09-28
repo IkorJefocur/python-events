@@ -31,7 +31,7 @@ class _EventSlot:
         for f in tuple(self.targets):
             if iscoroutinefunction(f):
                 loop = self.__loop__ or get_event_loop()
-                run_coroutine_threadsafe(f(*a, **kw), loop)
+                run_coroutine(f(*a, **kw), loop)
             else:
                 f(*a, **kw)
 
@@ -125,3 +125,12 @@ class Events:
                 if isinstance(val, self.__event_slot_cls__):
                     yield val
         return gen()
+
+
+def run_coroutine(coro, loop):
+    run_coroutine_threadsafe(coro, loop) \
+        .add_done_callback(propagate_future_exception)
+
+def propagate_future_exception(future):
+    if future.exception():
+        raise future.exception()
