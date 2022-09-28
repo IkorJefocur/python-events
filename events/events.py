@@ -14,17 +14,26 @@
 """
 
 
+from asyncio import run_coroutine_threadsafe, get_event_loop
+from inspect import iscoroutinefunction
+
+
 class _EventSlot:
-    def __init__(self, name):
+    def __init__(self, name, loop=None):
         self.targets = []
         self.__name__ = name
+        self.__loop__ = loop
 
     def __repr__(self):
         return "event '%s'" % self.__name__
 
     def __call__(self, *a, **kw):
         for f in tuple(self.targets):
-            f(*a, **kw)
+            if iscoroutinefunction(f):
+                loop = self.__loop__ or get_event_loop()
+                run_coroutine_threadsafe(f(*a, **kw), loop)
+            else:
+                f(*a, **kw)
 
     def __iadd__(self, f):
         self.targets.append(f)
@@ -69,8 +78,9 @@ class Events:
 
             xxx.OnChange = event('OnChange')
     """
-    def __init__(self, events=None, event_slot_cls=_EventSlot):
+    def __init__(self, events=None, loop=None, event_slot_cls=_EventSlot):
         self.__event_slot_cls__ = event_slot_cls
+        self.__loop__ = loop
 
         if events is not None:
 
@@ -96,7 +106,7 @@ class Events:
             if name not in self.__class__.__events__:
                 raise EventsException("Event '%s' is not declared" % name)
 
-        self.__dict__[name] = ev = self.__event_slot_cls__(name)
+        self.__dict__[name] = ev = self.__event_slot_cls__(name, self.__loop__)
         return ev
 
     def __repr__(self):
