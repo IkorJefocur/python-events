@@ -16,7 +16,7 @@
 
 from asyncio import run_coroutine_threadsafe, get_event_loop
 from traceback import print_exc
-from inspect import iscoroutinefunction
+from inspect import iscoroutine
 
 
 class _EventSlot:
@@ -31,11 +31,10 @@ class _EventSlot:
     def __call__(self, *a, **kw):
         for f in tuple(self.targets):
             try:
-                if iscoroutinefunction(f):
+                result = f(*a, **kw)
+                if iscoroutine(result):
                     loop = self.__loop__ or get_event_loop()
-                    run_coroutine(f(*a, **kw), loop)
-                else:
-                    f(*a, **kw)
+                    run_coroutine(result, loop)
             except Exception:
                 print_exc()
 
