@@ -1,9 +1,5 @@
 # -*- coding: utf-8 -*-
-from .events import Events, EventsException
+from .events import Events, EventSlot, EventsException
+from .interface import events_and_listeners, events_listeners, EventSlotListener
 
 __version__ = '0.4'
-
-__all__ = [
-    Events.__name__,
-    EventsException.__name__,
-]

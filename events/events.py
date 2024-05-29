@@ -14,12 +14,13 @@
 """
 
 
-from asyncio import run_coroutine_threadsafe, get_event_loop
+from asyncio import get_event_loop
 from traceback import print_exc
 from inspect import iscoroutine
+from .util import run_coroutine
 
 
-class _EventSlot:
+class EventSlot:
     def __init__(self, name, loop=None):
         self.targets = []
         self.__name__ = name
@@ -51,10 +52,8 @@ class _EventSlot:
         return len(self.targets)
 
     def __iter__(self):
-        def gen():
-            for target in self.targets:
-                yield target
-        return gen()
+        for target in self.targets:
+            yield target
 
     def __getitem__(self, key):
         return self.targets[key]
@@ -81,7 +80,7 @@ class Events:
 
             xxx.OnChange = event('OnChange')
     """
-    def __init__(self, events=None, loop=None, event_slot_cls=_EventSlot):
+    def __init__(self, events=None, loop=None, event_slot_cls=EventSlot):
         self.__event_slot_cls__ = event_slot_cls
         self.__loop__ = loop
 
@@ -99,22 +98,22 @@ class Events:
     def __getattr__(self, name):
         if name.startswith('__'):
             raise AttributeError("type object '%s' has no attribute '%s'" %
-                                 (self.__class__.__name__, name))
+                                 (type(self).__name__, name))
 
         if hasattr(self, '__events__'):
             if name not in self.__events__:
                 raise EventsException("Event '%s' is not declared" % name)
 
-        elif hasattr(self.__class__, '__events__'):
-            if name not in self.__class__.__events__:
+        elif hasattr(type(self), '__events__'):
+            if name not in type(self).__events__:
                 raise EventsException("Event '%s' is not declared" % name)
 
         self.__dict__[name] = ev = self.__event_slot_cls__(name, self.__loop__)
         return ev
 
     def __repr__(self):
-        return '<%s.%s object at %s>' % (self.__class__.__module__,
-                                         self.__class__.__name__,
+        return '<%s.%s object at %s>' % (type(self).__module__,
+                                         type(self).__name__,
                                          hex(id(self)))
 
     __str__ = __repr__
@@ -123,17 +122,13 @@ class Events:
         return len(list(self.__iter__()))
 
     def __iter__(self):
-        def gen(dictitems=self.__dict__.items()):
+        if hasattr(self, '__events__') or hasattr(type(self), '__events__'):
+            for name in getattr(self, '__events__', getattr(
+                type(self), '__events__', None
+            )):
+                yield getattr(self, name)
+
+        else:
             for attr, val in dictitems:
                 if isinstance(val, self.__event_slot_cls__):
                     yield val
-        return gen()
-
-
-def run_coroutine(coro, loop):
-    run_coroutine_threadsafe(coro, loop) \
-        .add_done_callback(propagate_future_exception)
-
-def propagate_future_exception(future):
-    if future.exception():
-        raise future.exception()
